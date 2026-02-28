@@ -22,6 +22,9 @@ import org.bukkit.util.Vector;
 import java.time.Duration;
 import java.util.*;
 
+import org.bukkit.block.Biome;
+import static org.bukkit.block.Biome.*;
+
 public class EventListener implements Listener {
 
     private final SoKrutoiFishing plugin;
@@ -48,7 +51,7 @@ public class EventListener implements Listener {
 
         private final Player player;
         private final FishHook hook;
-        private final UUID sessionId = UUID.randomUUID(); // защита от дублей
+        private final UUID sessionId = UUID.randomUUID();
 
         private int cursor = 0;
         private int direction = 1;
@@ -256,12 +259,13 @@ public class EventListener implements Listener {
     }
 
     // =========================================================
-    //                          РЫБА (без изменений)
+    //                          РЫБА
     // =========================================================
 
     private void spawnFish(Player player, Location loc) {
-        FishData fishData = generateFish();
-        plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + fishData.size() + " см");
+        org.bukkit.block.Biome biome = loc.getBlock().getBiome();
+        FishData fishData = generateFish(biome);
+        plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + fishData.size() + " см (" + fishData.rarity() + ")");
 
         ItemStack fish = new ItemStack(Material.COD);
         ItemMeta meta = fish.getItemMeta();
@@ -269,7 +273,12 @@ public class EventListener implements Listener {
         if (meta != null) {
             meta.displayName(Component.text(fishData.name(), NamedTextColor.WHITE)
                     .decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text("Размер: " + fishData.size() + " см", NamedTextColor.GRAY)));
+            meta.lore(List.of(
+                    Component.text("Размер: " + fishData.size() + " см", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("Редкость: " + fishData.rarity().displayName, fishData.rarity().color)
+                            .decoration(TextDecoration.ITALIC, false)
+            ));
             meta.setCustomModelData(fishData.modelData());
             fish.setItemMeta(meta);
         }
@@ -285,54 +294,81 @@ public class EventListener implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
     }
 
-    private FishData generateFish() {
+    private FishData generateFish(org.bukkit.block.Biome biome) {
+        BiomeType biomeType = getBiomeType(biome);
+
         List<FishData> fishes = List.of(
-                new FishData("Окунь",               1001, realisticSize(15, 45)),
-                new FishData("Плотва",              1002, realisticSize(10, 45)),
-                new FishData("Карась",              1003, realisticSize(10, 50)),
-                new FishData("Краснопёрка",         1004, realisticSize(10, 40)),
-                new FishData("Густера",             1005, realisticSize(12, 38)),
-                new FishData("Лещ",                 1006, realisticSize(20, 80)),
-
-                new FishData("Щука",                1007, realisticSize(40, 110)),
-                new FishData("Судак",               1008, realisticSize(40, 100)),
-                new FishData("Голавль",             1009, realisticSize(20, 60)),
-                new FishData("Язь",                 1010, realisticSize(25, 65)),
-                new FishData("Карп",                1011, realisticSize(25, 100)),
-                new FishData("Сазан",               1012, realisticSize(35, 110)),
-
-                new FishData("Налим",               1013, realisticSize(30, 90)),
-                new FishData("Линь",                1014, realisticSize(20, 70)),
-                new FishData("Амур белый",          1015, realisticSize(50, 130)),
-                new FishData("Толстолобик",         1016, realisticSize(50, 140)),
-                new FishData("Сом",                 1017, realisticSize(70, 300)),
-
-                new FishData("Стерлядь",            1018, realisticSize(40, 110)),
-                new FishData("Осётр",               1019, realisticSize(80, 220)),
-                new FishData("Белуга",              1020, realisticSize(150, 500)),
-                new FishData("Пиранья красная",     1021, realisticSize(15, 50)),
-                new FishData("Тигровая рыба",       1024, realisticSize(50, 160)),
-                new FishData("Аллигатор гар",       1025, realisticSize(120, 320)),
-                new FishData("Гигантский сом Меконга", 1026, realisticSize(150, 350)),
-
-                new FishData("Нильский окунь",      1027, realisticSize(80, 220)),
-                new FishData("Гигантский барбус",   1028, realisticSize(70, 180)),
-
-                new FishData("Снук",                1030, realisticSize(50, 130)),
-                new FishData("Тарпон",              1031, realisticSize(100, 280)),
-                new FishData("Пермит",              1032, realisticSize(40, 120)),
-                new FishData("Синяя медуза",        1033, realisticSize(7, 70)),
-
-                new FishData("Гигантская ставрида", 1034, realisticSize(70, 180)),
-                new FishData("Корифена (Махи-Махи)",1035, realisticSize(80, 220)),
-                new FishData("Ваху",                1036, realisticSize(90, 250)),
-                new FishData("Жёлтопёрый тунец",    1037, realisticSize(100, 300)),
-                new FishData("Синий марлин",        1038, realisticSize(250, 600)),
-                new FishData("Парусник",            1039, realisticSize(200, 400)),
-                new FishData("Меч-рыба",            1040, realisticSize(180, 450)),
-                new FishData("Рыба-петух",          1041, realisticSize(70, 160))
+                new FishData("Окунь",                  1001, realisticSize(15, 45),   Rarity.COMMON,    BiomeType.FRESHWATER),
+                new FishData("Плотва",                 1002, realisticSize(10, 45),   Rarity.COMMON,    BiomeType.FRESHWATER),
+                new FishData("Карась",                 1003, realisticSize(10, 50),   Rarity.COMMON,    BiomeType.FRESHWATER),
+                new FishData("Краснопёрка",            1004, realisticSize(10, 40),   Rarity.COMMON,    BiomeType.FRESHWATER),
+                new FishData("Густера",                1005, realisticSize(12, 38),   Rarity.COMMON,    BiomeType.FRESHWATER),
+                new FishData("Лещ",                    1006, realisticSize(20, 80),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Щука",                   1007, realisticSize(40, 110),  Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Судак",                  1008, realisticSize(40, 100),  Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Голавль",                1009, realisticSize(20, 60),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Язь",                    1010, realisticSize(25, 65),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Карп",                   1011, realisticSize(25, 100),  Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Сазан",                  1012, realisticSize(35, 110),  Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Налим",                  1013, realisticSize(30, 90),   Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Линь",                   1014, realisticSize(20, 70),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
+                new FishData("Амур белый",             1015, realisticSize(50, 130),  Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Толстолобик",            1016, realisticSize(50, 140),  Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Сом",                    1017, realisticSize(70, 300),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Стерлядь",               1018, realisticSize(40, 110),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Осётр",                  1019, realisticSize(80, 220),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Белуга",                 1020, realisticSize(150, 500), Rarity.LEGENDARY, BiomeType.FRESHWATER),
+                new FishData("Пиранья красная",        1021, realisticSize(15, 50),   Rarity.RARE,      BiomeType.FRESHWATER),
+                new FishData("Тигровая рыба",          1024, realisticSize(50, 160),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Аллигатор гар",          1025, realisticSize(120, 320), Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Гигантский сом Меконга", 1026, realisticSize(150, 350), Rarity.LEGENDARY, BiomeType.FRESHWATER),
+                new FishData("Нильский окунь",         1027, realisticSize(80, 220),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Гигантский барбус",      1028, realisticSize(70, 180),  Rarity.EPIC,      BiomeType.FRESHWATER),
+                new FishData("Снук",                   1030, realisticSize(50, 130),  Rarity.COMMON,    BiomeType.OCEAN),
+                new FishData("Тарпон",                 1031, realisticSize(100, 280), Rarity.UNCOMMON,  BiomeType.OCEAN),
+                new FishData("Пермит",                 1032, realisticSize(40, 120),  Rarity.UNCOMMON,  BiomeType.OCEAN),
+                new FishData("Гигантская ставрида",    1034, realisticSize(70, 180),  Rarity.RARE,      BiomeType.OCEAN),
+                new FishData("Корифена (Махи-Махи)",   1035, realisticSize(80, 220),  Rarity.RARE,      BiomeType.OCEAN),
+                new FishData("Ваху",                   1036, realisticSize(90, 250),  Rarity.RARE,      BiomeType.OCEAN),
+                new FishData("Жёлтопёрый тунец",       1037, realisticSize(100, 300), Rarity.EPIC,      BiomeType.OCEAN),
+                new FishData("Синий марлин",           1038, realisticSize(250, 600), Rarity.LEGENDARY, BiomeType.OCEAN),
+                new FishData("Парусник",               1039, realisticSize(200, 400), Rarity.LEGENDARY, BiomeType.OCEAN),
+                new FishData("Меч-рыба",               1040, realisticSize(180, 450), Rarity.LEGENDARY, BiomeType.OCEAN),
+                new FishData("Рыба-петух",             1041, realisticSize(70, 160),  Rarity.EPIC,      BiomeType.OCEAN),
+                new FishData("Синяя медуза",           1033, realisticSize(7, 70),    Rarity.UNCOMMON,  BiomeType.ANY)
         );
-        return fishes.get(random.nextInt(fishes.size()));
+
+        List<FishData> pool = fishes.stream()
+                .filter(f -> f.biome() == BiomeType.ANY || f.biome() == biomeType)
+                .toList();
+
+        int totalWeight = pool.stream().mapToInt(f -> f.rarity().weight).sum();
+        int roll = random.nextInt(totalWeight);
+        int cumulative = 0;
+        for (FishData f : pool) {
+            cumulative += f.rarity().weight;
+            if (roll < cumulative) return f;
+        }
+        return pool.get(pool.size() - 1);
+    }
+
+    private static final Set<Biome> OCEAN_BIOMES = Set.of(
+            Biome.OCEAN,
+            Biome.DEEP_OCEAN,
+            Biome.COLD_OCEAN,
+            Biome.DEEP_COLD_OCEAN,
+            Biome.FROZEN_OCEAN,
+            Biome.DEEP_FROZEN_OCEAN,
+            Biome.LUKEWARM_OCEAN,
+            Biome.DEEP_LUKEWARM_OCEAN,
+            Biome.WARM_OCEAN,
+            Biome.BEACH,
+            Biome.STONY_SHORE,
+            Biome.SNOWY_BEACH
+    );
+
+    private BiomeType getBiomeType(Biome biome) {
+        return OCEAN_BIOMES.contains(biome) ? BiomeType.OCEAN : BiomeType.FRESHWATER;
     }
 
     private int realisticSize(int min, int max) {
@@ -342,6 +378,25 @@ public class EventListener implements Listener {
         int size = (int) (mean + gaussian * deviation);
         return Math.max(min, Math.min(max, size));
     }
+    private enum Rarity {
+        COMMON(100,    "Обычная",    NamedTextColor.WHITE),
+        UNCOMMON(40,   "Необычная",  NamedTextColor.GREEN),
+        RARE(15,       "Редкая",     NamedTextColor.AQUA),
+        EPIC(5,        "Эпическая",  NamedTextColor.LIGHT_PURPLE),
+        LEGENDARY(1,   "Легендарная",NamedTextColor.GOLD);
 
-    private record FishData(String name, int modelData, int size) {}
+        final int weight;
+        final String displayName;
+        final NamedTextColor color;
+
+        Rarity(int weight, String displayName, NamedTextColor color) {
+            this.weight = weight;
+            this.displayName = displayName;
+            this.color = color;
+        }
+    }
+
+    private enum BiomeType { FRESHWATER, OCEAN, ANY }
+
+    private record FishData(String name, int modelData, int size, Rarity rarity, BiomeType biome) {}
 }

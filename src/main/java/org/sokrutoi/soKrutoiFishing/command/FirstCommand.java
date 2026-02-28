@@ -21,8 +21,8 @@ public class FirstCommand extends AbstractCommand {
 
         if (args[0].equalsIgnoreCase("help")) {
             sender.sendMessage(ChatColor.GREEN + "Это меню помощи: \n" +
-                    "1. lol \n" +
-                    "2. kek");
+                    "1. Рыбачьте \n" +
+                    "2. в разных биомах разная рыба");
         }
     }
 
