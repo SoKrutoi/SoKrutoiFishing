@@ -1,0 +1,5 @@
+name: SoKrutoiFishing
+version: '1.0'
+main: org.sokrutoi.soKrutoiFishing.SoKrutoiFishing
+api-version: '1.21'
+description: testing
