@@ -7,3 +7,5 @@
 <img width="262" height="132" alt="javaw_TtlGj3JJKf" src="https://github.com/user-attachments/assets/5ff8c4ce-a190-4563-b3f6-bdc1c1959e1d" />
 
 <img width="822" height="73" alt="msedge_JE8xeiqniT" src="https://github.com/user-attachments/assets/8e10dec9-d89b-4ba2-80e4-549c72e25a54" />
+
+(ресурспак не доделан, нет текстур рыб, все рыбы это треска)
