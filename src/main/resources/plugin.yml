@@ -3,3 +3,17 @@ version: '${version}'
 main: org.sokrutoi.soKrutoiFishing.SoKrutoiFishing
 api-version: '1.21'
 description: testing
+
+commands:
+  sokrutoi:
+    description: Команды плагина SoKrutoiFishing
+    permission: sokrutoi.use
+    usage: /sokrutoi <help|toggle>
+
+permissions:
+  sokrutoi.use:
+    description: Базовый доступ к командам
+    default: true
+  sokrutoi.admin:
+    description: Доступ к команде toggle
+    default: op
