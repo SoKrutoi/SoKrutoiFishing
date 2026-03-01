@@ -1,0 +1,269 @@
+# ============================================================
+#                     НАСТРОЙКИ РЫБАЛКИ
+# ============================================================
+
+# Время (в секундах) на вытаскивание рыбы после мини-игры
+timeout-seconds: 25
+
+# Скорость курсора: base + random(0..range)
+cursor-speed-base: 0.35
+cursor-speed-range: 0.25
+
+# Биомы считающиеся океанскими (остальные — пресноводные)
+ocean-biomes:
+  - OCEAN
+  - DEEP_OCEAN
+  - COLD_OCEAN
+  - DEEP_COLD_OCEAN
+  - FROZEN_OCEAN
+  - DEEP_FROZEN_OCEAN
+  - LUKEWARM_OCEAN
+  - DEEP_LUKEWARM_OCEAN
+  - WARM_OCEAN
+  - BEACH
+  - STONY_SHORE
+  - SNOWY_BEACH
+
+# Паттерны мини-игры (G=зелёный, Y=жёлтый, R=красный)
+patterns:
+  - "RRRYYYYGGGGGYYYYRRYYYGGYY"
+  - "RRYYYYGGGYYYYRRRRYYYYGG"
+  - "RRRYYYGGGGYYYYYYRRRGG"
+  - "RRYYYYYGGGGYYYYRRRYYY"
+  - "GGGRRRGGGRRRGGGRRRGGGRRR"
+  - "RRRGGGGGRRRGGGGGRRR"
+  - "YYYYGGGYYYYGGGYYYYGGG"
+  - "RRRRRYGGGGYRRRRR"
+  - "GGGRRRRRRRRRGGG"
+  - "RRYGGGYRRYGGGYRRYGGGYRR"
+
+# Рыбы
+# biome: FRESHWATER / OCEAN / ANY
+# rarity: COMMON / UNCOMMON / RARE / EPIC / LEGENDARY
+fish:
+  # ── Пресноводные обычные ──────────────────────────────────
+  - name: "Окунь"
+    model-data: 1001
+    min-size: 15
+    max-size: 40
+    rarity: COMMON
+    biome: FRESHWATER
+
+  - name: "Плотва"
+    model-data: 1002
+    min-size: 10
+    max-size: 40
+    rarity: COMMON
+    biome: FRESHWATER
+
+  - name: "Карась"
+    model-data: 1003
+    min-size: 10
+    max-size: 45
+    rarity: COMMON
+    biome: FRESHWATER
+
+  - name: "Краснопёрка"
+    model-data: 1004
+    min-size: 10
+    max-size: 35
+    rarity: COMMON
+    biome: FRESHWATER
+
+  - name: "Лещ"
+    model-data: 1006
+    min-size: 20
+    max-size: 75
+    rarity: UNCOMMON
+    biome: FRESHWATER
+
+  # ── Пресноводные необычные ────────────────────────────────
+  - name: "Щука"
+    model-data: 1007
+    min-size: 40
+    max-size: 105
+    rarity: UNCOMMON
+    biome: FRESHWATER
+
+  - name: "Судак"
+    model-data: 1008
+    min-size: 40
+    max-size: 95
+    rarity: UNCOMMON
+    biome: FRESHWATER
+
+  - name: "Язь"
+    model-data: 1010
+    min-size: 25
+    max-size: 60
+    rarity: UNCOMMON
+    biome: FRESHWATER
+
+  # ── Пресноводные редкие ───────────────────────────────────
+  - name: "Карп"
+    model-data: 1011
+    min-size: 25
+    max-size: 95
+    rarity: RARE
+    biome: FRESHWATER
+
+  - name: "Амур белый"
+    model-data: 1015
+    min-size: 50
+    max-size: 125
+    rarity: RARE
+    biome: FRESHWATER
+
+  - name: "Толстолобик"
+    model-data: 1016
+    min-size: 50
+    max-size: 135
+    rarity: RARE
+    biome: FRESHWATER
+
+  - name: "Пиранья красная"
+    model-data: 1021
+    min-size: 15
+    max-size: 30
+    rarity: RARE
+    biome: FRESHWATER
+
+  # ── Пресноводные эпические ────────────────────────────────
+  - name: "Сом"
+    model-data: 1017
+    min-size: 70
+    max-size: 300
+    rarity: EPIC
+    biome: FRESHWATER
+
+  - name: "Стерлядь"
+    model-data: 1018
+    min-size: 40
+    max-size: 105
+    rarity: EPIC
+    biome: FRESHWATER
+
+  - name: "Осётр"
+    model-data: 1019
+    min-size: 80
+    max-size: 215
+    rarity: EPIC
+    biome: FRESHWATER
+
+  - name: "Тигровая рыба"
+    model-data: 1024
+    min-size: 50
+    max-size: 160
+    rarity: EPIC
+    biome: FRESHWATER
+
+  - name: "Аллигатор гар"
+    model-data: 1025
+    min-size: 120
+    max-size: 320
+    rarity: EPIC
+    biome: FRESHWATER
+
+  - name: "Рыба-петух"
+    model-data: 1041
+    min-size: 70
+    max-size: 160
+    rarity: EPIC
+    biome: FRESHWATER
+
+  # ── Пресноводные легендарные ──────────────────────────────
+  - name: "Белуга"
+    model-data: 1020
+    min-size: 150
+    max-size: 500
+    rarity: LEGENDARY
+    biome: FRESHWATER
+
+  - name: "Гигантский сом Меконга"
+    model-data: 1026
+    min-size: 150
+    max-size: 350
+    rarity: LEGENDARY
+    biome: FRESHWATER
+
+  # ── Морские обычные ───────────────────────────────────────
+  - name: "Снук"
+    model-data: 1030
+    min-size: 50
+    max-size: 130
+    rarity: COMMON
+    biome: OCEAN
+
+  - name: "Тарпон"
+    model-data: 1031
+    min-size: 100
+    max-size: 280
+    rarity: UNCOMMON
+    biome: OCEAN
+
+  - name: "Пермит"
+    model-data: 1032
+    min-size: 40
+    max-size: 120
+    rarity: UNCOMMON
+    biome: OCEAN
+
+  # ── Морские редкие ────────────────────────────────────────
+  - name: "Гигантская ставрида"
+    model-data: 1034
+    min-size: 70
+    max-size: 180
+    rarity: RARE
+    biome: OCEAN
+
+  - name: "Корифена (Махи-Махи)"
+    model-data: 1035
+    min-size: 80
+    max-size: 220
+    rarity: RARE
+    biome: OCEAN
+
+  - name: "Ваху"
+    model-data: 1036
+    min-size: 90
+    max-size: 250
+    rarity: RARE
+    biome: OCEAN
+
+  # ── Морские эпические ─────────────────────────────────────
+  - name: "Жёлтопёрый тунец"
+    model-data: 1037
+    min-size: 100
+    max-size: 300
+    rarity: EPIC
+    biome: OCEAN
+
+  # ── Морские легендарные ───────────────────────────────────
+  - name: "Синий марлин"
+    model-data: 1038
+    min-size: 250
+    max-size: 600
+    rarity: LEGENDARY
+    biome: OCEAN
+
+  - name: "Парусник"
+    model-data: 1039
+    min-size: 200
+    max-size: 400
+    rarity: LEGENDARY
+    biome: OCEAN
+
+  - name: "Меч-рыба"
+    model-data: 1040
+    min-size: 180
+    max-size: 450
+    rarity: LEGENDARY
+    biome: OCEAN
+
+  # ── Везде ─────────────────────────────────────────────────
+  - name: "Синяя медуза"
+    model-data: 1033
+    min-size: 7
+    max-size: 70
+    rarity: UNCOMMON
+    biome: ANY

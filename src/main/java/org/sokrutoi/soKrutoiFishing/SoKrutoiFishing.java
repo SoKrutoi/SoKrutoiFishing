@@ -10,7 +10,9 @@ public final class SoKrutoiFishing extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        saveDefaultConfig(); // ← добавь эту строку
         eventListener = new EventListener(this);
+        eventListener.loadConfig();
         getServer().getPluginManager().registerEvents(eventListener, this);
     }
 

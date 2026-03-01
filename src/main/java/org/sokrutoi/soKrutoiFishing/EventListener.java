@@ -31,13 +31,12 @@ public class EventListener implements Listener {
     private final Map<UUID, FishingSession> sessions = new HashMap<>();
     private final Random random = new Random();
 
-    private final List<String> patterns = List.of(
-            "RRRYYYYGGGGGYYYYRRYYYGGYY",
-            "RRYYYYGGGYYYYRRRRYYYYGG",
-            "RRRYYYGGGGYYYYYYRRRGG",
-            "RRYYYYYGGGGYYYYRRRYYY",
-            "GGGRRRGGGRRRGGGRRRGGGRRR"
-    );
+    private List<String> patterns = new ArrayList<>();
+    private List<FishData> fishList = new ArrayList<>();
+    private Set<Biome> oceanBiomes = new HashSet<>();
+    private int timeoutTicks = 25 * 20;
+    private double speedBase = 0.35;
+    private double speedRange = 0.25;
 
     public EventListener(SoKrutoiFishing plugin) {
         this.plugin = plugin;
@@ -67,7 +66,7 @@ public class EventListener implements Listener {
             this.player = player;
             this.hook = hook;
             this.pattern = patterns.get(random.nextInt(patterns.size()));
-            this.speed = 0.35 + random.nextDouble() * 0.25;
+            this.speed = speedBase + random.nextDouble() * speedRange;
         }
 
         public void start() {
@@ -82,14 +81,15 @@ public class EventListener implements Listener {
                 ready = true;
                 startRenderingTask();
 
+                // ПОСЛЕ:
                 plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                     if (sessions.get(player.getUniqueId()) == FishingSession.this) {
                         sessions.remove(player.getUniqueId());
                         stop();
-                        plugin.getLogger().info(player.getName() + " не успел вытащить рыбу (таймаут 25 сек)");
+                        plugin.getLogger().info(player.getName() + " не успел вытащить рыбу (таймаут)");
                         player.sendMessage(Component.text("Рыба сорвалась...", NamedTextColor.GRAY));
                     }
-                }, 25 * 20L);
+                }, timeoutTicks);
 
             }, 3L);
         }
@@ -166,6 +166,46 @@ public class EventListener implements Listener {
     // =========================================================
     //                         СОБЫТИЯ
     // =========================================================
+
+    public void loadConfig() {
+        plugin.reloadConfig();
+        var cfg = plugin.getConfig();
+
+        patterns = new ArrayList<>(cfg.getStringList("patterns"));
+        if (patterns.isEmpty()) {
+            patterns = new ArrayList<>(List.of("RRRYYYYGGGGGYYYYRRYYYGGYY"));
+            plugin.getLogger().warning("Паттерны не найдены в конфиге, использую дефолтный");
+        }
+
+        timeoutTicks = cfg.getInt("timeout-seconds", 25) * 20;
+        speedBase    = cfg.getDouble("cursor-speed-base", 0.35);
+        speedRange   = cfg.getDouble("cursor-speed-range", 0.25);
+
+        oceanBiomes = new HashSet<>();
+        for (String s : cfg.getStringList("ocean-biomes")) {
+            try {
+                oceanBiomes.add(Biome.valueOf(s));
+            } catch (IllegalArgumentException ex) {
+                plugin.getLogger().warning("Неизвестный биом в конфиге: " + s);
+            }
+        }
+
+        fishList = new ArrayList<>();
+        for (var entry : cfg.getMapList("fish")) {
+            try {
+                String name     = (String) entry.get("name");
+                int modelData   = (int) entry.get("model-data");
+                int minSize     = (int) entry.get("min-size");
+                int maxSize     = (int) entry.get("max-size");
+                Rarity rarity   = Rarity.valueOf((String) entry.get("rarity"));
+                BiomeType biome = BiomeType.valueOf((String) entry.get("biome"));
+                fishList.add(new FishData(name, modelData, minSize, maxSize, rarity, biome));
+            } catch (Exception ex) {
+                plugin.getLogger().warning("Ошибка в записи рыбы: " + entry + " — " + ex.getMessage());
+            }
+        }
+        plugin.getLogger().info("Загружено " + fishList.size() + " рыб, " + patterns.size() + " паттернов");
+    }
 
     public void stopAllSessions() {
         if (sessions.isEmpty()) return;
@@ -263,9 +303,10 @@ public class EventListener implements Listener {
     // =========================================================
 
     private void spawnFish(Player player, Location loc) {
-        org.bukkit.block.Biome biome = loc.getBlock().getBiome();
+        Biome biome = loc.getBlock().getBiome();
         FishData fishData = generateFish(biome);
-        plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + fishData.size() + " см (" + fishData.rarity() + ")");
+        int size = fishData.rollSize(random);
+        plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + size + " см (" + fishData.rarity() + ")");
 
         ItemStack fish = new ItemStack(Material.COD);
         ItemMeta meta = fish.getItemMeta();
@@ -274,7 +315,7 @@ public class EventListener implements Listener {
             meta.displayName(Component.text(fishData.name(), NamedTextColor.WHITE)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Размер: " + fishData.size() + " см", NamedTextColor.GRAY)
+                    Component.text("Размер: " + size + " см", NamedTextColor.GRAY)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.text("Редкость: " + fishData.rarity().displayName, fishData.rarity().color)
                             .decoration(TextDecoration.ITALIC, false)
@@ -286,61 +327,33 @@ public class EventListener implements Listener {
         Item item = loc.getWorld().dropItem(loc, fish);
 
         Vector direction = player.getLocation().toVector().subtract(loc.toVector());
+        double horizontalDist = Math.sqrt(direction.getX() * direction.getX() + direction.getZ() * direction.getZ());
         direction.setY(0);
-        Vector velocity = direction.normalize().multiply(0.45);
-        velocity.setY(0.45);
+
+        double verticalSpeed = 0.45;
+
+        double horizontalSpeed = horizontalDist / 18.0;
+
+        horizontalSpeed = Math.max(horizontalSpeed, 0.15);
+
+        Vector velocity = direction.normalize().multiply(horizontalSpeed);
+        velocity.setY(verticalSpeed);
 
         item.setVelocity(velocity);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
     }
 
-    private FishData generateFish(org.bukkit.block.Biome biome) {
+    private FishData generateFish(Biome biome) {
         BiomeType biomeType = getBiomeType(biome);
 
-        List<FishData> fishes = List.of(
-                new FishData("Окунь",                  1001, realisticSize(15, 45),   Rarity.COMMON,    BiomeType.FRESHWATER),
-                new FishData("Плотва",                 1002, realisticSize(10, 45),   Rarity.COMMON,    BiomeType.FRESHWATER),
-                new FishData("Карась",                 1003, realisticSize(10, 50),   Rarity.COMMON,    BiomeType.FRESHWATER),
-                new FishData("Краснопёрка",            1004, realisticSize(10, 40),   Rarity.COMMON,    BiomeType.FRESHWATER),
-                new FishData("Густера",                1005, realisticSize(12, 38),   Rarity.COMMON,    BiomeType.FRESHWATER),
-                new FishData("Лещ",                    1006, realisticSize(20, 80),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Щука",                   1007, realisticSize(40, 110),  Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Судак",                  1008, realisticSize(40, 100),  Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Голавль",                1009, realisticSize(20, 60),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Язь",                    1010, realisticSize(25, 65),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Карп",                   1011, realisticSize(25, 100),  Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Сазан",                  1012, realisticSize(35, 110),  Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Налим",                  1013, realisticSize(30, 90),   Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Линь",                   1014, realisticSize(20, 70),   Rarity.UNCOMMON,  BiomeType.FRESHWATER),
-                new FishData("Амур белый",             1015, realisticSize(50, 130),  Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Толстолобик",            1016, realisticSize(50, 140),  Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Сом",                    1017, realisticSize(70, 300),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Стерлядь",               1018, realisticSize(40, 110),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Осётр",                  1019, realisticSize(80, 220),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Белуга",                 1020, realisticSize(150, 500), Rarity.LEGENDARY, BiomeType.FRESHWATER),
-                new FishData("Пиранья красная",        1021, realisticSize(15, 50),   Rarity.RARE,      BiomeType.FRESHWATER),
-                new FishData("Тигровая рыба",          1024, realisticSize(50, 160),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Аллигатор гар",          1025, realisticSize(120, 320), Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Гигантский сом Меконга", 1026, realisticSize(150, 350), Rarity.LEGENDARY, BiomeType.FRESHWATER),
-                new FishData("Нильский окунь",         1027, realisticSize(80, 220),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Гигантский барбус",      1028, realisticSize(70, 180),  Rarity.EPIC,      BiomeType.FRESHWATER),
-                new FishData("Снук",                   1030, realisticSize(50, 130),  Rarity.COMMON,    BiomeType.OCEAN),
-                new FishData("Тарпон",                 1031, realisticSize(100, 280), Rarity.UNCOMMON,  BiomeType.OCEAN),
-                new FishData("Пермит",                 1032, realisticSize(40, 120),  Rarity.UNCOMMON,  BiomeType.OCEAN),
-                new FishData("Гигантская ставрида",    1034, realisticSize(70, 180),  Rarity.RARE,      BiomeType.OCEAN),
-                new FishData("Корифена (Махи-Махи)",   1035, realisticSize(80, 220),  Rarity.RARE,      BiomeType.OCEAN),
-                new FishData("Ваху",                   1036, realisticSize(90, 250),  Rarity.RARE,      BiomeType.OCEAN),
-                new FishData("Жёлтопёрый тунец",       1037, realisticSize(100, 300), Rarity.EPIC,      BiomeType.OCEAN),
-                new FishData("Синий марлин",           1038, realisticSize(250, 600), Rarity.LEGENDARY, BiomeType.OCEAN),
-                new FishData("Парусник",               1039, realisticSize(200, 400), Rarity.LEGENDARY, BiomeType.OCEAN),
-                new FishData("Меч-рыба",               1040, realisticSize(180, 450), Rarity.LEGENDARY, BiomeType.OCEAN),
-                new FishData("Рыба-петух",             1041, realisticSize(70, 160),  Rarity.EPIC,      BiomeType.OCEAN),
-                new FishData("Синяя медуза",           1033, realisticSize(7, 70),    Rarity.UNCOMMON,  BiomeType.ANY)
-        );
-
-        List<FishData> pool = fishes.stream()
+        List<FishData> pool = fishList.stream()
                 .filter(f -> f.biome() == BiomeType.ANY || f.biome() == biomeType)
                 .toList();
+
+        if (pool.isEmpty()) {
+            plugin.getLogger().warning("Нет рыб для биома " + biome + ", беру первую из списка");
+            return fishList.get(0);
+        }
 
         int totalWeight = pool.stream().mapToInt(f -> f.rarity().weight).sum();
         int roll = random.nextInt(totalWeight);
@@ -352,32 +365,11 @@ public class EventListener implements Listener {
         return pool.get(pool.size() - 1);
     }
 
-    private static final Set<Biome> OCEAN_BIOMES = Set.of(
-            Biome.OCEAN,
-            Biome.DEEP_OCEAN,
-            Biome.COLD_OCEAN,
-            Biome.DEEP_COLD_OCEAN,
-            Biome.FROZEN_OCEAN,
-            Biome.DEEP_FROZEN_OCEAN,
-            Biome.LUKEWARM_OCEAN,
-            Biome.DEEP_LUKEWARM_OCEAN,
-            Biome.WARM_OCEAN,
-            Biome.BEACH,
-            Biome.STONY_SHORE,
-            Biome.SNOWY_BEACH
-    );
-
+    // ПОСЛЕ:
     private BiomeType getBiomeType(Biome biome) {
-        return OCEAN_BIOMES.contains(biome) ? BiomeType.OCEAN : BiomeType.FRESHWATER;
+        return oceanBiomes.contains(biome) ? BiomeType.OCEAN : BiomeType.FRESHWATER;
     }
 
-    private int realisticSize(int min, int max) {
-        double gaussian = random.nextGaussian();
-        double mean = (min + max) / 2.0;
-        double deviation = (max - min) / 6.0;
-        int size = (int) (mean + gaussian * deviation);
-        return Math.max(min, Math.min(max, size));
-    }
     private enum Rarity {
         COMMON(100,    "Обычная",    NamedTextColor.WHITE),
         UNCOMMON(40,   "Необычная",  NamedTextColor.GREEN),
@@ -398,5 +390,14 @@ public class EventListener implements Listener {
 
     private enum BiomeType { FRESHWATER, OCEAN, ANY }
 
-    private record FishData(String name, int modelData, int size, Rarity rarity, BiomeType biome) {}
+    // ПОСЛЕ:
+    private record FishData(String name, int modelData, int minSize, int maxSize, Rarity rarity, BiomeType biome) {
+        public int rollSize(Random rng) {
+            double gaussian = rng.nextGaussian();
+            double mean = (minSize + maxSize) / 2.0;
+            double deviation = (maxSize - minSize) / 6.0;
+            int size = (int) (mean + gaussian * deviation);
+            return Math.max(minSize, Math.min(maxSize, size));
+        }
+    }
 }
