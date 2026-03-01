@@ -4,7 +4,7 @@
 
 <img width="1920" height="1009" alt="javaw_DjSiIBJ4WG" src="https://github.com/user-attachments/assets/5b604392-f4a5-4dc8-a3c0-a4513bb63038" />
 
-<video src="https://github.com/user-attachments/assets/35da68a8-fc1c-46e8-9e5d-e4e9666166b9" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/ea1fecab-7da9-481c-9bbf-d19a87d24af8" width="100%" controls></video>
 
 <img width="262" height="132" alt="javaw_TtlGj3JJKf" src="https://github.com/user-attachments/assets/5ff8c4ce-a190-4563-b3f6-bdc1c1959e1d" />
 
