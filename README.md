@@ -4,7 +4,7 @@
 
 <img width="1920" height="1009" alt="javaw_DjSiIBJ4WG" src="https://github.com/user-attachments/assets/5b604392-f4a5-4dc8-a3c0-a4513bb63038" />
 
-https://github.com/user-attachments/assets/b17a67e8-251b-4cad-a7ae-016ba75b4c74
+<video src="https://github.com/SoKrutoi/SoKrutoiFishing/output.mp4" width="100%"></video>
 
 <img width="262" height="132" alt="javaw_TtlGj3JJKf" src="https://github.com/user-attachments/assets/5ff8c4ce-a190-4563-b3f6-bdc1c1959e1d" />
 
