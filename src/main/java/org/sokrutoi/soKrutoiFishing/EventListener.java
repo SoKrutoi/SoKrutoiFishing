@@ -38,6 +38,8 @@ public class EventListener implements Listener {
     private double speedBase = 0.35;
     private double speedRange = 0.25;
 
+    private boolean customFishingEnabled = true;
+
     public EventListener(SoKrutoiFishing plugin) {
         this.plugin = plugin;
     }
@@ -61,6 +63,9 @@ public class EventListener implements Listener {
         public boolean isReady() { return ready; }
 
         private BukkitTask task;
+        private BukkitTask timeoutTask;
+
+        public Player getPlayer() { return player; }
 
         public FishingSession(Player player, FishHook hook) {
             this.player = player;
@@ -81,8 +86,7 @@ public class EventListener implements Listener {
                 ready = true;
                 startRenderingTask();
 
-                // ПОСЛЕ:
-                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                timeoutTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                     if (sessions.get(player.getUniqueId()) == FishingSession.this) {
                         sessions.remove(player.getUniqueId());
                         stop();
@@ -110,8 +114,9 @@ public class EventListener implements Listener {
                         player.clearTitle();
                         return;
                     }
-                    if (sessions.get(player.getUniqueId()) != FishingSession.this ||
-                            !sessions.get(player.getUniqueId()).sessionId.equals(sessionId)) {
+
+                    FishingSession current = sessions.get(player.getUniqueId());
+                    if (current != FishingSession.this) {
                         plugin.getLogger().info(player.getName() + " — сессия устарела (дубль) — задача остановлена");
                         cancel();
                         player.clearTitle();
@@ -139,7 +144,7 @@ public class EventListener implements Listener {
                 switch (c) {
                     case 'G' -> bar = bar.append(Component.text("\uE001"));
                     case 'Y' -> bar = bar.append(Component.text("\uE002"));
-                    default -> bar = bar.append(Component.text("\uE003"));
+                    default  -> bar = bar.append(Component.text("\uE003"));
                 }
             }
             return bar;
@@ -150,26 +155,31 @@ public class EventListener implements Listener {
         }
 
         public void stop() {
-            if (task != null) {
-                task.cancel();
-                task = null;
-            }
+            if (task != null) { task.cancel(); task = null; }
+            if (timeoutTask != null) { timeoutTask.cancel(); timeoutTask = null; }
             player.clearTitle();
             player.resetTitle();
         }
 
-        public FishHook getHook() {
-            return hook;
-        }
+        public FishHook getHook() { return hook; }
     }
 
     // =========================================================
     //                         СОБЫТИЯ
     // =========================================================
 
+    public boolean toggleCustomFishing() {
+        customFishingEnabled = !customFishingEnabled;
+        plugin.getConfig().set("custom-fishing", customFishingEnabled);
+        plugin.saveConfig();
+        return customFishingEnabled;
+    }
+
     public void loadConfig() {
         plugin.reloadConfig();
         var cfg = plugin.getConfig();
+
+        customFishingEnabled = cfg.getBoolean("custom-fishing", true);
 
         patterns = new ArrayList<>(cfg.getStringList("patterns"));
         if (patterns.isEmpty()) {
@@ -218,6 +228,7 @@ public class EventListener implements Listener {
 
     @EventHandler
     public void onFish(PlayerFishEvent e) {
+
         Player player = e.getPlayer();
         UUID uuid = player.getUniqueId();
         FishingSession session = sessions.get(uuid);
@@ -228,22 +239,7 @@ public class EventListener implements Listener {
             if (session != null) {
                 Location hookLoc = session.getHook().getLocation().clone();
                 FishHook hookRef = session.getHook();
-                sessions.remove(uuid);
-                session.stop();
-
-                if (session.isSuccess()) {
-                    plugin.getLogger().info(player.getName() + " попал в зелёную зону (CAUGHT_FISH)");
-                    spawnFish(player, hookLoc);
-                } else {
-                    plugin.getLogger().info(player.getName() + " промахнулся (CAUGHT_FISH, во время BITE)");
-                    player.sendMessage(Component.text("Рыба сорвалась!", NamedTextColor.RED));
-                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
-                }
-
-                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                    hookRef.remove();
-                }, 5L);
-
+                resolveSession(uuid, hookLoc, hookRef);
             } else {
                 plugin.getLogger().info(player.getName() + " подсёк — мини-игра запущена");
                 FishingSession newSession = new FishingSession(player, e.getHook());
@@ -254,28 +250,13 @@ public class EventListener implements Listener {
         }
 
         if (session != null && session.getHook() == e.getHook()) {
-
             switch (e.getState()) {
                 case REEL_IN:
                     if (session.isReady()) {
                         e.setCancelled(true);
                         Location hookLoc = session.getHook().getLocation().clone();
                         FishHook hookRef = session.getHook();
-                        sessions.remove(uuid);
-                        session.stop();
-
-                        if (session.isSuccess()) {
-                            plugin.getLogger().info(player.getName() + " попал в зелёную зону (REEL_IN)");
-                            spawnFish(player, hookLoc);
-                        } else {
-                            plugin.getLogger().info(player.getName() + " промахнулся (REEL_IN)");
-                            player.sendMessage(Component.text("Рыба сорвалась!", NamedTextColor.RED));
-                            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
-                        }
-
-                        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                            hookRef.remove();
-                        }, 5L);
+                        resolveSession(uuid, hookLoc, hookRef);
                     } else {
                         plugin.getLogger().info(player.getName() + " нажал ПКМ до готовности мини-игры — игнорируем");
                     }
@@ -302,48 +283,72 @@ public class EventListener implements Listener {
     //                          РЫБА
     // =========================================================
 
-    private void spawnFish(Player player, Location loc) {
-        Biome biome = loc.getBlock().getBiome();
-        FishData fishData = generateFish(biome);
-        int size = fishData.rollSize(random);
-        plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + size + " см (" + fishData.rarity() + ")");
+    private void resolveSession(UUID uuid, Location hookLoc, FishHook hookRef) {
+        FishingSession session = sessions.remove(uuid);
+        if (session == null) return;
+        session.stop();
 
-        ItemStack fish = new ItemStack(Material.COD);
-        ItemMeta meta = fish.getItemMeta();
-
-        if (meta != null) {
-            meta.displayName(Component.text(fishData.name(), NamedTextColor.WHITE)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(
-                    Component.text("Размер: " + size + " см", NamedTextColor.GRAY)
-                            .decoration(TextDecoration.ITALIC, false),
-                    Component.text("Редкость: " + fishData.rarity().displayName, fishData.rarity().color)
-                            .decoration(TextDecoration.ITALIC, false)
-            ));
-            meta.setCustomModelData(fishData.modelData());
-            fish.setItemMeta(meta);
+        Player player = session.getPlayer();
+        if (session.isSuccess()) {
+            plugin.getLogger().info(player.getName() + " попал в зелёную зону");
+            spawnFish(player, hookLoc);
+        } else {
+            plugin.getLogger().info(player.getName() + " промахнулся");
+            player.sendMessage(Component.text("Рыба сорвалась!", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
         }
 
-        Item item = loc.getWorld().dropItem(loc, fish);
+        plugin.getServer().getScheduler().runTaskLater(plugin, hookRef::remove, 5L);
+    }
+
+    private void spawnFish(Player player, Location loc) {
+        Item item;
+
+        if (customFishingEnabled) {
+            Biome biome = loc.clone().add(0, 1, 0).getBlock().getBiome();
+            FishData fishData = generateFish(biome);
+            int size = fishData.rollSize(random);
+            plugin.getLogger().info(player.getName() + " выловил " + fishData.name() + " размером " + size + " см (" + fishData.rarity() + ")");
+
+            ItemStack fish = new ItemStack(Material.COD);
+            ItemMeta meta = fish.getItemMeta();
+            if (meta != null) {
+                meta.displayName(Component.text(fishData.name(), NamedTextColor.WHITE)
+                        .decoration(TextDecoration.ITALIC, false));
+                meta.lore(List.of(
+                        Component.text("Размер: " + size + " см", NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false),
+                        Component.text("Редкость: " + fishData.rarity().displayName, fishData.rarity().color)
+                                .decoration(TextDecoration.ITALIC, false)
+                ));
+                meta.setCustomModelData(fishData.modelData());
+                fish.setItemMeta(meta);
+            }
+            item = loc.getWorld().dropItem(loc, fish);
+        } else {
+            Material[] vanillaFish = {Material.COD, Material.SALMON, Material.TROPICAL_FISH, Material.PUFFERFISH};
+            ItemStack vanilla = new ItemStack(vanillaFish[random.nextInt(vanillaFish.length)]);
+            item = loc.getWorld().dropItem(loc, vanilla);
+            plugin.getLogger().info(player.getName() + " выловил ванильный предмет");
+        }
 
         Vector direction = player.getLocation().toVector().subtract(loc.toVector());
         double horizontalDist = Math.sqrt(direction.getX() * direction.getX() + direction.getZ() * direction.getZ());
         direction.setY(0);
 
-        double verticalSpeed = 0.45;
-
-        double horizontalSpeed = horizontalDist / 18.0;
-
-        horizontalSpeed = Math.max(horizontalSpeed, 0.15);
-
+        double horizontalSpeed = Math.max(horizontalDist / 18.0, 0.15);
         Vector velocity = direction.normalize().multiply(horizontalSpeed);
-        velocity.setY(verticalSpeed);
+        velocity.setY(0.45);
 
         item.setVelocity(velocity);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
     }
 
     private FishData generateFish(Biome biome) {
+        if (fishList.isEmpty()) {
+            throw new IllegalStateException("Список рыб пуст — проверьте конфиг!");
+        }
+
         BiomeType biomeType = getBiomeType(biome);
 
         List<FishData> pool = fishList.stream()
@@ -365,7 +370,6 @@ public class EventListener implements Listener {
         return pool.get(pool.size() - 1);
     }
 
-    // ПОСЛЕ:
     private BiomeType getBiomeType(Biome biome) {
         return oceanBiomes.contains(biome) ? BiomeType.OCEAN : BiomeType.FRESHWATER;
     }
@@ -390,7 +394,6 @@ public class EventListener implements Listener {
 
     private enum BiomeType { FRESHWATER, OCEAN, ANY }
 
-    // ПОСЛЕ:
     private record FishData(String name, int modelData, int minSize, int maxSize, Rarity rarity, BiomeType biome) {
         public int rollSize(Random rng) {
             double gaussian = rng.nextGaussian();
